@@ -24,7 +24,7 @@ describe('AvatarConfigService', () => {
 
     it('should return the list of sources with the default order when the user provides an unknown list of sources', () => {
       const userConfig: AvatarConfig = {
-        sourcePriorityOrder: <any>['UNKOWN_SOURCE']
+        sourcePriorityOrder: ['UNKNOWN_SOURCE' as AvatarSource]
       };
       const avatarConfigService = new AvatarConfigService(userConfig);
 
@@ -44,6 +44,7 @@ describe('AvatarConfigService', () => {
         AvatarSource.TWITTER,
         AvatarSource.FACEBOOK,
         AvatarSource.GOOGLE,
+        AvatarSource.INSTAGRAM,
         AvatarSource.VKONTAKTE,
         AvatarSource.SKYPE,
         AvatarSource.GRAVATAR,
@@ -67,6 +68,7 @@ describe('AvatarConfigService', () => {
         AvatarSource.FACEBOOK,
         AvatarSource.GOOGLE,
         AvatarSource.TWITTER,
+        AvatarSource.INSTAGRAM,
         AvatarSource.VKONTAKTE,
         AvatarSource.SKYPE,
         AvatarSource.GRAVATAR,
@@ -81,7 +83,7 @@ describe('AvatarConfigService', () => {
   });
 
   describe('AvatarColors', () => {
-    it("should return the user's list of colors when provided in the avatar configuration", () => {
+    it('should return the user\'s list of colors when provided in the avatar configuration', () => {
       const userColors = ['#ccc', '#fff'];
       const userConfig: AvatarConfig = {
         colors: userColors

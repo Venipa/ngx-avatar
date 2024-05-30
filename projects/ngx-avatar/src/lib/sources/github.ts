@@ -2,7 +2,7 @@ import { AsyncSource } from './async-source';
 import { AvatarSource } from './avatar-source.enum';
 
 /**
- *  Github source impelementation.
+ *  GitHub source implementation.
  *  Fetch avatar source based on github identifier
  */
 export class Github extends AsyncSource {
@@ -19,7 +19,7 @@ export class Github extends AsyncSource {
   /**
    * extract github avatar from json data
    */
-  public processResponse(data: any, size?: number): string {
+  public processResponse(data: { avatar_url: string }, size?: number): string {
     if (size) {
       return `${data.avatar_url}&s=${size}`;
     }

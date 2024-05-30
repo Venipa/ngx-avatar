@@ -3,9 +3,8 @@ import {
   Input,
   Output,
   EventEmitter,
-  ElementRef,
   OnChanges,
-  SimpleChange,
+  SimpleChanges,
   OnDestroy
 } from '@angular/core';
 
@@ -15,6 +14,8 @@ import { SourceFactory } from './sources/source.factory';
 import { AvatarService } from './avatar.service';
 import { AvatarSource } from './sources/avatar-source.enum';
 import { takeWhile, map } from 'rxjs/operators';
+
+type Style = Partial<CSSStyleDeclaration>;
 
 /**
  * Universal avatar component that
@@ -31,7 +32,7 @@ import { takeWhile, map } from 'rxjs/operators';
   styles: [
     `
       :host {
-        border-radius: '50%';
+        border-radius: 50%;
       }
     `
   ],
@@ -47,8 +48,9 @@ import { takeWhile, map } from 'rxjs/operators';
         [width]="size"
         [height]="size"
         [ngStyle]="avatarStyle"
-        (error)="fetchAvatarSource($event)"
+        (error)="fetchAvatarSource()"
         class="avatar-content"
+        loading="lazy"
       />
       <ng-template #textAvatar>
         <div *ngIf="avatarText" class="avatar-content" [ngStyle]="avatarStyle">
@@ -62,64 +64,65 @@ export class AvatarComponent implements OnChanges, OnDestroy {
   @Input()
   public round = true;
   @Input()
-  public size = 50;
+  public size: string | number = 50;
   @Input()
   public textSizeRatio = 3;
   @Input()
-  public bgColor: string;
+  public bgColor: string | undefined;
   @Input()
   public fgColor = '#FFF';
   @Input()
-  public borderColor: string;
+  public borderColor: string | undefined;
   @Input()
-  public style: any = {};
+  public style: Style = {};
   @Input()
-  public cornerRadius = 0;
+  public cornerRadius: string | number = 0;
   @Input('facebookId')
-  public facebook: string;
+  public facebook?: string | null;
   @Input('twitterId')
-  public twitter: string;
+  public twitter?: string | null;
   @Input('googleId')
-  public google: string;
+  public google?: string | null;
+  @Input('instagramId')
+  public instagram?: string | null;
   @Input('vkontakteId')
-  public vkontakte: string;
+  public vkontakte?: string | null;
   @Input('skypeId')
-  public skype: string;
+  public skype?: string | null;
   @Input('gravatarId')
-  public gravatar: string;
+  public gravatar?: string | null;
   @Input('githubId')
-  public github: string;
+  public github?: string | null;
   @Input('src')
-  public custom: string;
+  public custom?: string | null;
   @Input('name')
-  public initials: string;
-  @Input('value')
-  public value: string;
-  @Input('placeholder')
-  public placeholder: string;
-  @Input('initialsSize')
-  public initialsSize: number;
+  public initials?: string | null;
+  @Input()
+  public value?: string | null;
+  @Input()
+  public placeholder?: string;
+  @Input()
+  public initialsSize: string | number = 0;
 
   @Output()
-  public clickOnAvatar: EventEmitter<any> = new EventEmitter<any>();
+  public clickOnAvatar: EventEmitter<Source> = new EventEmitter<Source>();
 
   public isAlive = true;
-  public avatarSrc: string;
-  public avatarText: string;
-  public avatarStyle: any = {};
-  public hostStyle: any = {};
+  public avatarSrc: string | null = null;
+  public avatarText: string | null = null;
+  public avatarStyle: Style = {};
+  public hostStyle: Style = {};
 
-  private currentSource = 0;
-  private sources: Source[] = Array();
+  private currentIndex = -1;
+  private sources: Source[] = [];
 
   constructor(
-    public elementRef: ElementRef,
     public sourceFactory: SourceFactory,
     private avatarService: AvatarService
   ) {}
 
   public onAvatarClicked(): void {
-    this.clickOnAvatar.emit(this.sources[this.currentSource - 1]);
+    this.clickOnAvatar.emit(this.sources[this.currentIndex]);
   }
 
   /**
@@ -129,17 +132,19 @@ export class AvatarComponent implements OnChanges, OnDestroy {
    *
    * memberof AvatarComponent
    */
-  public ngOnChanges(changes: { [propKey: string]: SimpleChange }): void {
+  public ngOnChanges(changes: SimpleChanges): void {
     for (const propName in changes) {
-      if (
-        this.avatarService.isSource(propName) &&
-        changes[propName].currentValue
-      ) {
+      if (this.avatarService.isSource(propName)) {
+        const sourceType: AvatarSource = AvatarSource[propName.toUpperCase() as keyof typeof AvatarSource] ;
         const currentValue = changes[propName].currentValue;
-        this.addSource(AvatarSource[propName.toUpperCase()], currentValue);
+        if (currentValue && typeof currentValue === 'string') {
+          this.addSource(sourceType, currentValue);
+        } else {
+          this.removeSource(sourceType);
+        }
       }
     }
-    // reintialize the avatar component when a source property value has changed
+    // reinitialize the avatar component when a source property value has changed
     // the fallback system must be re-invoked with the new values.
     this.initializeAvatar();
   }
@@ -147,23 +152,36 @@ export class AvatarComponent implements OnChanges, OnDestroy {
   /**
    * Fetch avatar source
    *
-   * param {any} event
-   *
    * memberOf AvatarComponent
    */
-  public fetchAvatarSource(event?: any): void {
-    const avatarSource = this.sources[this.currentSource];
-    if (!avatarSource) {
+  public fetchAvatarSource(): void {
+    const previousSource = this.sources[this.currentIndex];
+    if (previousSource) {
+      this.avatarService.markSourceAsFailed(previousSource);
+    }
+
+    const source = this.findNextSource();
+    if (!source) {
       return;
     }
-    if (this.avatarService.isTextAvatar(avatarSource.sourceType)) {
-      this.buildTextAvatar(avatarSource);
-      // TODO: check if this is needed
-      this.avatarSrc = undefined;
+
+    if (this.avatarService.isTextAvatar(source.sourceType)) {
+      this.buildTextAvatar(source);
+      this.avatarSrc = null;
     } else {
-      this.buildImageAvatar(avatarSource);
+      this.buildImageAvatar(source);
     }
-    this.currentSource++;
+  }
+
+  private findNextSource(): Source | null {
+    while (++this.currentIndex < this.sources.length) {
+      const source = this.sources[this.currentIndex];
+      if (source && !this.avatarService.sourceHasFailedBefore(source)) {
+        return source;
+      }
+    }
+
+    return null;
   }
 
   public ngOnDestroy(): void {
@@ -174,8 +192,8 @@ export class AvatarComponent implements OnChanges, OnDestroy {
    * Initialize the avatar component and its fallback system
    */
   private initializeAvatar(): void {
-    this.currentSource = 0;
-    if (this.sources.length > 0 && this.sources[this.currentSource]) {
+    this.currentIndex = -1;
+    if (this.sources.length > 0) {
       this.sortAvatarSources();
       this.fetchAvatarSource();
       this.hostStyle = {
@@ -187,12 +205,12 @@ export class AvatarComponent implements OnChanges, OnDestroy {
 
   private sortAvatarSources(): void {
     this.sources.sort((source1, source2) =>
-      this.avatarService.copmareSources(source1.sourceType, source2.sourceType)
+      this.avatarService.compareSources(source1.sourceType, source2.sourceType)
     );
   }
 
   private buildTextAvatar(avatarSource: Source): void {
-    this.avatarText = avatarSource.getAvatar(this.initialsSize);
+    this.avatarText = avatarSource.getAvatar(+this.initialsSize);
     this.avatarStyle = this.getInitialsStyle(avatarSource.sourceId);
   }
 
@@ -201,7 +219,7 @@ export class AvatarComponent implements OnChanges, OnDestroy {
     if (avatarSource instanceof AsyncSource) {
       this.fetchAndProcessAsyncAvatar(avatarSource);
     } else {
-      this.avatarSrc = avatarSource.getAvatar(this.size);
+      this.avatarSrc = avatarSource.getAvatar(+this.size);
     }
   }
 
@@ -211,7 +229,7 @@ export class AvatarComponent implements OnChanges, OnDestroy {
    *
    * memberOf AvatarComponent
    */
-  private getInitialsStyle(avatarValue: string): void {
+  private getInitialsStyle(avatarValue: string): Style {
     return {
       textAlign: 'center',
       borderRadius: this.round ? '100%' : this.cornerRadius + 'px',
@@ -222,7 +240,7 @@ export class AvatarComponent implements OnChanges, OnDestroy {
         ? this.bgColor
         : this.avatarService.getRandomColor(avatarValue),
       font:
-        Math.floor(this.size / this.textSizeRatio) +
+        Math.floor(+this.size / this.textSizeRatio) +
         'px Helvetica, Arial, sans-serif',
       lineHeight: this.size + 'px',
       ...this.style
@@ -235,37 +253,39 @@ export class AvatarComponent implements OnChanges, OnDestroy {
    *
    * memberOf AvatarComponent
    */
-  private getImageStyle(): void {
+  private getImageStyle(): Style {
     return {
       maxWidth: '100%',
       borderRadius: this.round ? '50%' : this.cornerRadius + 'px',
       border: this.borderColor ? '1px solid ' + this.borderColor : '',
-      width: this.size,
-      height: this.size,
-      ...this.style
+      width: this.size + 'px',
+      height: this.size + 'px',
+      ...this.style,
     };
   }
   /**
-   * Fetch avatar image asynchrounsly.
+   * Fetch avatar image asynchronously.
    *
    * param {Source} source represents avatar source
    * memberof AvatarComponent
    */
   private fetchAndProcessAsyncAvatar(source: AsyncSource): void {
+    if (this.avatarService.sourceHasFailedBefore(source)) {
+      return;
+    }
+
     this.avatarService
-      .fetchAvatar(source.getAvatar())
-      .pipe(
-        takeWhile(() => this.isAlive),
-        map(response => source.processResponse(response, this.size))
-      )
-      .subscribe(
-        avatarSrc => (this.avatarSrc = avatarSrc),
-        err => {
-          console.error(
-            `ngx-avatar: error while fetching ${source.sourceType} avatar `
-          );
-        }
-      );
+        .fetchAvatar(source.getAvatar(+this.size))
+        .pipe(
+            takeWhile(() => this.isAlive),
+            map(response => source.processResponse(response, +this.size)),
+        )
+        .subscribe(
+            avatarSrc => (this.avatarSrc = avatarSrc),
+            err => {
+              this.fetchAvatarSource();
+            },
+        );
   }
 
   /**
@@ -275,19 +295,22 @@ export class AvatarComponent implements OnChanges, OnDestroy {
    * param sourceValue  source value e.g facebookId value, etc.
    */
   private addSource(sourceType: AvatarSource, sourceValue: string): void {
-    if (!this.isSourceExist(sourceType)) {
-      this.sources.push(
-        this.sourceFactory.newInstance(sourceType, sourceValue)
-      );
+    const source = this.sources.find(s => s.sourceType === sourceType);
+    if (source) {
+      source.sourceId = sourceValue;
     } else {
-      const index = this.sources.findIndex(
-        source => source.sourceType === sourceType
+      this.sources.push(
+          this.sourceFactory.newInstance(sourceType, sourceValue),
       );
-      this.sources[index].sourceId = sourceValue;
     }
   }
 
-  private isSourceExist(avatarSource: AvatarSource): boolean {
-    return this.sources.map(source => source.sourceType).includes(avatarSource);
+  /**
+   * Remove avatar source
+   *
+   * param sourceType avatar source type e.g facebook,twitter, etc.
+   */
+  private removeSource(sourceType: AvatarSource): void {
+    this.sources = this.sources.filter(source => source.sourceType !== sourceType);
   }
 }

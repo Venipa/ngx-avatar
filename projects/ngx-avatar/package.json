@@ -1,7 +1,7 @@
 {
   "name": "ngx-avatar",
-  "description": "A universal avatar component for Angular 4+ applications that fetches / generates avatar based on the information you have about the user.",
-  "version": "3.7.0",
+  "description": "A universal avatar component for Angular applications that fetches / generates avatar based on the information you have about the user.",
+  "version": "4.1.0",
   "keywords": [
     "angular",
     "avatar",
@@ -13,12 +13,13 @@
     "type": "git",
     "url": "https://github.com/HaithemMosbahi/ngx-avatar"
   },
+  "sideEffects": false,
   "dependencies": {
-    "is-retina": "^1.0.3",
-    "ts-md5": "^1.2.4"
+    "ts-md5": "^1.2.4",
+    "tslib": "^2.0.0"
   },
   "peerDependencies": {
-    "@angular/common": "^6.0.0 || ^7.0.0 || ^8.0.0",
-    "@angular/core": "^6.0.0 || ^7.0.0 || ^8.0.0"
+    "@angular/common": "^11.1.0",
+    "@angular/core": "^11.1.0"
   }
 }
